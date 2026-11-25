@@ -9,330 +9,239 @@ export class Audio {
     this.musicGain = null
     this.sfxGain = null
     this.ambienceGain = null
-    
+
     // Volume levels (0-1)
     this.musicVolume = 0.5
     this.sfxVolume = 0.7
     this.ambienceVolume = 0.2
-    
+
     // Mute state
     this.muted = false
-    
+
     // Audio buffers storage
     this.buffers = new Map()
-    
+
     // Currently playing sources (for stopping/cleanup)
     this.activeSources = new Map()
-    
+
     // Music state
-    this.currentMusic = null
-    this.musicSource = null
-    this.musicStartTime = 0
-    this.musicPauseTime = 0
-    
+    this.currentMusic  = null
+    this.musicSource   = null
+
     // Loading state
-    this.loaded = false
+    this.loaded     = false
     this.loadErrors = []
-    
-    // Audio file definitions
+
+    // Audio file definitions — MP3 for music, WAV for SFX
     this.audioFiles = {
-      // Music (looped) - NEW SUNO AI GENERATED MP3 TRACKS
-      music_menu: '/audio/danfo_dash_menu_theme.mp3',
-      music_gameplay: '/audio/danfo_dash_gameplay_loop.mp3',
-      
-      // Sound effects (one-shot) - Original WAV files preserved
-      sfx_coin: '/audio/sfx_coin_crystal.wav',
-      sfx_jump: '/audio/sfx_jump_whoosh.wav',
-      sfx_slide: '/audio/sfx_slide.wav',
-      sfx_collision: '/audio/sfx_collision.wav',
-      sfx_powerup: '/audio/sfx_powerup.wav',
-      sfx_gameover: '/audio/sfx_game_over.wav',
-      sfx_victory: '/audio/sfx_victory.wav',
-      sfx_click: '/audio/sfx_ui_click.wav',
-      
-      // Ambience (looped, low volume) - Original WAV preserved
-      ambience_traffic: '/audio/sfx_lagos_traffic_ambience.wav'
+      music_menu:      '/audio/danfo_dash_menu_theme.mp3',
+      music_gameplay:  '/audio/danfo_dash_gameplay_loop.mp3',
+      sfx_coin:        '/audio/sfx_coin_crystal.wav',
+      sfx_jump:        '/audio/sfx_jump_whoosh.wav',
+      sfx_slide:       '/audio/sfx_slide.wav',
+      sfx_collision:   '/audio/sfx_collision.wav',
+      sfx_powerup:     '/audio/sfx_powerup.wav',
+      sfx_gameover:    '/audio/sfx_game_over.wav',
+      sfx_victory:     '/audio/sfx_victory.wav',
+      sfx_click:       '/audio/sfx_ui_click.wav',
+      ambience_traffic:'/audio/sfx_lagos_traffic_ambience.wav',
     }
   }
 
-  // ── Initialization ─────────────────────────────────────────────────────
-  
+  // ── Initialization ──────────────────────────────────────────────────────
+  // Called during the loading screen. Creates the AudioContext (browsers
+  // allow creation before a gesture — context starts suspended, resume()
+  // unlocks it on first interaction) and pre-fetches all audio buffers so
+  // they are ready the instant the user first interacts.
   async init() {
     this._ensureContext()
     if (!this.ctx) {
-      console.warn('AudioContext not available')
+      console.warn('⚠️ AudioContext unavailable — audio disabled')
       return false
     }
-    
+
     try {
       await this._loadAllAudio()
       this.loaded = true
-      console.log('✅ Audio system initialized:', this.buffers.size, 'files loaded')
+      console.log('✅ Audio ready:', this.buffers.size, 'buffers loaded')
       if (this.loadErrors.length > 0) {
-        console.warn('⚠️ Some audio files failed to load:', this.loadErrors)
+        console.warn('⚠️ Some audio skipped:', this.loadErrors.map(e => e.key).join(', '))
       }
       return true
-    } catch (error) {
-      console.error('❌ Audio initialization failed:', error)
+    } catch (err) {
+      console.error('❌ Audio init error:', err)
       return false
     }
   }
 
   _ensureContext() {
     if (this.ctx) return
-    
     try {
       this.ctx = new (window.AudioContext || window.webkitAudioContext)()
-      
-      // Create gain nodes for separate volume control
+
       this.masterGain = this.ctx.createGain()
       this.masterGain.gain.value = this.muted ? 0 : 1
       this.masterGain.connect(this.ctx.destination)
-      
+
       this.musicGain = this.ctx.createGain()
       this.musicGain.gain.value = this.musicVolume
       this.musicGain.connect(this.masterGain)
-      
+
       this.sfxGain = this.ctx.createGain()
       this.sfxGain.gain.value = this.sfxVolume
       this.sfxGain.connect(this.masterGain)
-      
+
       this.ambienceGain = this.ctx.createGain()
       this.ambienceGain.gain.value = this.ambienceVolume
       this.ambienceGain.connect(this.masterGain)
-      
-    } catch (error) {
-      console.error('Failed to create AudioContext:', error)
+    } catch (e) {
+      console.error('AudioContext creation failed:', e)
       this.ctx = null
     }
   }
 
-  // ── Audio Loading ──────────────────────────────────────────────────────
-  
+  // ── Audio Loading ───────────────────────────────────────────────────────
   async _loadAllAudio() {
-    const promises = Object.entries(this.audioFiles).map(([key, path]) => 
+    const tasks = Object.entries(this.audioFiles).map(([key, path]) =>
       this._loadAudioFile(key, path)
     )
-    await Promise.allSettled(promises)
+    await Promise.allSettled(tasks)
   }
 
   async _loadAudioFile(key, path) {
     try {
-      // Race the fetch + decode against a 10-second timeout so a stalled
-      // file never blocks the entire loading sequence
-      const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error(`Timeout loading ${path}`)), 10000)
+      const timeout = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error(`Timeout: ${path}`)), 10000)
       )
-
-      const fetchPromise = fetch(path).then(async response => {
-        if (!response.ok) throw new Error(`HTTP ${response.status}: ${path}`)
-        const arrayBuffer = await response.arrayBuffer()
-        // decodeAudioData wrapped in explicit Promise — some browsers stall
-        // on the callback form; others stall on the promise form with bad data
-        const audioBuffer = await new Promise((resolve, reject) => {
-          this.ctx.decodeAudioData(arrayBuffer, resolve, reject)
-        })
-        return audioBuffer
+      const load = fetch(path).then(async res => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}: ${path}`)
+        const ab  = await res.arrayBuffer()
+        const buf = await new Promise((resolve, reject) =>
+          this.ctx.decodeAudioData(ab, resolve, reject)
+        )
+        return buf
       })
-
-      const audioBuffer = await Promise.race([fetchPromise, timeoutPromise])
-      this.buffers.set(key, audioBuffer)
-      return audioBuffer
-
-    } catch (error) {
-      this.loadErrors.push({ key, path, error: error.message })
-      console.warn(`⚠️ Audio skipped (non-fatal): ${key} — ${error.message}`)
-      return null  // Never throw — let Promise.allSettled handle it gracefully
+      const buf = await Promise.race([load, timeout])
+      this.buffers.set(key, buf)
+      return buf
+    } catch (err) {
+      this.loadErrors.push({ key, path, error: err.message })
+      console.warn(`⚠️ Audio skipped (${key}): ${err.message}`)
+      return null
     }
   }
 
-  // ── Playback Control ───────────────────────────────────────────────────
-  
-  /**
-   * Resume AudioContext (required after user interaction due to autoplay policy)
-   */
+  // ── Unlock AudioContext after user gesture ──────────────────────────────
+  // Called on the first click / touchstart. Only needs to call ctx.resume().
+  // All buffers are already loaded from init() so music plays immediately.
   async resume() {
-    this._ensureContext()
-    if (this.ctx && this.ctx.state === 'suspended') {
+    if (!this.ctx) return
+    if (this.ctx.state === 'suspended') {
       try {
         await this.ctx.resume()
-        console.log('AudioContext resumed')
-      } catch (error) {
-        console.warn('Failed to resume AudioContext:', error)
+      } catch (e) {
+        console.warn('AudioContext resume failed:', e)
       }
     }
   }
 
-  /**
-   * Play a sound effect (non-looping, can overlap)
-   */
+  // ── Playback ────────────────────────────────────────────────────────────
   play(name) {
-    // Map game event names to audio keys
     const sfxMap = {
-      'coin': 'sfx_coin',
-      'jump': 'sfx_jump',
-      'slide': 'sfx_slide',
-      'hit': 'sfx_collision',
-      'powerup': 'sfx_powerup',
-      'gameover': 'sfx_gameover',
-      'victory': 'sfx_victory',
-      'click': 'sfx_click',
-      'start': 'sfx_click' // Use click sound for start until specific sound exists
+      coin:    'sfx_coin',
+      jump:    'sfx_jump',
+      slide:   'sfx_slide',
+      hit:     'sfx_collision',
+      powerup: 'sfx_powerup',
+      gameover:'sfx_gameover',
+      victory: 'sfx_victory',
+      click:   'sfx_click',
+      start:   'sfx_click',
     }
-    
-    const audioKey = sfxMap[name] || name
-    this._playSound(audioKey, this.sfxGain, false)
+    this._playSound(sfxMap[name] || name, this.sfxGain, false)
   }
 
-  /**
-   * Play background music (looped)
-   * @param {string} type - 'menu' or 'gameplay'
-   */
   playMusic(type) {
-    const musicKey = type === 'menu' ? 'music_menu' : 'music_gameplay'
-    
-    // Don't restart if already playing the same music
-    if (this.currentMusic === musicKey && this.musicSource) {
-      return
-    }
-    
-    // Stop current music first
+    const key = type === 'menu' ? 'music_menu' : 'music_gameplay'
+    if (this.currentMusic === key && this.musicSource) return   // already playing
     this.stopMusic()
-    
-    this.currentMusic = musicKey
-    this._playSound(musicKey, this.musicGain, true, (source) => {
-      this.musicSource = source
-      this.musicStartTime = this.ctx.currentTime
+    this.currentMusic = key
+    this._playSound(key, this.musicGain, true, source => {
+      if (this.currentMusic === key) {
+        this.musicSource = source
+      } else {
+        try { source.stop() } catch (_) {}
+      }
     })
   }
 
-  /**
-   * Stop background music
-   */
   stopMusic() {
     if (this.musicSource) {
-      try {
-        this.musicSource.stop()
-      } catch (e) {
-        // Already stopped
-      }
+      try { this.musicSource.stop() } catch (_) {}
       this.musicSource = null
     }
     this.currentMusic = null
   }
 
-  /**
-   * Play ambience (looped, quiet)
-   */
   playAmbience() {
-    // Only play if not already playing
-    if (this.activeSources.has('ambience_traffic')) {
-      return
-    }
-    
-    this._playSound('ambience_traffic', this.ambienceGain, true, (source) => {
-      this.activeSources.set('ambience_traffic', source)
+    if (this.activeSources.has('ambience_traffic')) return
+    this._playSound('ambience_traffic', this.ambienceGain, true, src => {
+      this.activeSources.set('ambience_traffic', src)
     })
   }
 
-  /**
-   * Stop ambience
-   */
   stopAmbience() {
-    const source = this.activeSources.get('ambience_traffic')
-    if (source) {
-      try {
-        source.stop()
-      } catch (e) {
-        // Already stopped
-      }
+    const src = this.activeSources.get('ambience_traffic')
+    if (src) {
+      try { src.stop() } catch (_) {}
       this.activeSources.delete('ambience_traffic')
     }
   }
 
-  /**
-   * Internal method to play any sound
-   */
   _playSound(key, gainNode, loop = false, onSourceCreated = null) {
-    if (this.muted && !loop) return // Allow looped sounds to be created but inaudible
-    
-    this._ensureContext()
-    if (!this.ctx) return
-    
+    if (this.muted && !loop) return
+    if (!this.ctx || !gainNode) return
     const buffer = this.buffers.get(key)
-    if (!buffer) {
-      // Silently fail for missing audio - game continues
-      return
-    }
-    
+    if (!buffer) return   // buffer not ready — silent fail
     try {
       const source = this.ctx.createBufferSource()
       source.buffer = buffer
-      source.loop = loop
+      source.loop   = loop
       source.connect(gainNode)
-      
-      // Cleanup on end
       source.onended = () => {
-        if (!loop && this.activeSources.get(key) === source) {
-          this.activeSources.delete(key)
-        }
+        if (!loop) this.activeSources.delete(key + '_' + source._id)
       }
-      
       source.start(0)
-      
-      if (onSourceCreated) {
-        onSourceCreated(source)
-      }
-      
-      // Track non-looped sources for potential cleanup
+      if (onSourceCreated) onSourceCreated(source)
       if (!loop) {
-        this.activeSources.set(key + '_' + Date.now(), source)
+        const id = Date.now() + Math.random()
+        source._id = id
+        this.activeSources.set(key + '_' + id, source)
       }
-      
-    } catch (error) {
-      console.warn(`Failed to play audio: ${key}`, error)
+    } catch (e) {
+      console.warn(`_playSound(${key}) failed:`, e)
     }
   }
 
-  // ── Volume Controls ────────────────────────────────────────────────────
-  
-  /**
-   * Set music volume (0-1)
-   */
-  setMusicVolume(volume) {
-    this.musicVolume = Math.max(0, Math.min(1, volume))
-    if (this.musicGain) {
-      this.musicGain.gain.value = this.musicVolume
-    }
+  // ── Volume / mute ───────────────────────────────────────────────────────
+  setMusicVolume(v) {
+    this.musicVolume = Math.max(0, Math.min(1, v))
+    if (this.musicGain) this.musicGain.gain.value = this.musicVolume
   }
 
-  /**
-   * Set sound effects volume (0-1)
-   */
-  setSfxVolume(volume) {
-    this.sfxVolume = Math.max(0, Math.min(1, volume))
-    if (this.sfxGain) {
-      this.sfxGain.gain.value = this.sfxVolume
-    }
+  setSfxVolume(v) {
+    this.sfxVolume = Math.max(0, Math.min(1, v))
+    if (this.sfxGain) this.sfxGain.gain.value = this.sfxVolume
   }
 
-  /**
-   * Set ambience volume (0-1)
-   */
-  setAmbienceVolume(volume) {
-    this.ambienceVolume = Math.max(0, Math.min(1, volume))
-    if (this.ambienceGain) {
-      this.ambienceGain.gain.value = this.ambienceVolume
-    }
+  setAmbienceVolume(v) {
+    this.ambienceVolume = Math.max(0, Math.min(1, v))
+    if (this.ambienceGain) this.ambienceGain.gain.value = this.ambienceVolume
   }
 
-  /**
-   * Toggle mute for all audio
-   */
   setMuted(muted) {
     this.muted = muted
     if (this.masterGain) {
-      // Smooth volume transition
       this.masterGain.gain.setTargetAtTime(
         muted ? 0 : 1,
         this.ctx.currentTime,
@@ -341,74 +250,38 @@ export class Audio {
     }
   }
 
-  // ── Cleanup ────────────────────────────────────────────────────────────
-  
-  /**
-   * Stop all audio and clean up
-   */
+  // ── Cleanup ─────────────────────────────────────────────────────────────
   stopAll() {
     this.stopMusic()
     this.stopAmbience()
-    
-    // Stop all active sound effects
-    for (const [key, source] of this.activeSources.entries()) {
-      try {
-        source.stop()
-      } catch (e) {
-        // Already stopped
-      }
+    for (const src of this.activeSources.values()) {
+      try { src.stop() } catch (_) {}
     }
     this.activeSources.clear()
   }
 
-  /**
-   * Dispose of audio context
-   */
   dispose() {
     this.stopAll()
-    
     if (this.ctx) {
-      try {
-        this.ctx.close()
-      } catch (e) {
-        console.warn('Error closing AudioContext:', e)
-      }
+      try { this.ctx.close() } catch (_) {}
       this.ctx = null
     }
   }
 }
 
-// ════════════════════════════════════════════════════════════════════════════
-// INTEGRATION HELPERS
-// ════════════════════════════════════════════════════════════════════════════
-
-/**
- * Integration function: Call this when game state changes to menu
- * @param {Audio} audioSystem - The audio system instance
- */
-export function transitionToMenuMusic(audioSystem) {
-  audioSystem.stopAmbience()
-  audioSystem.playMusic('menu')
+// ── Integration helpers ─────────────────────────────────────────────────────
+export function transitionToMenuMusic(audio) {
+  audio.stopAmbience()
+  audio.playMusic('menu')
 }
 
-/**
- * Integration function: Call this when gameplay starts
- * @param {Audio} audioSystem - The audio system instance
- */
-export function transitionToGameplayAudio(audioSystem) {
-  audioSystem.stopMusic()
-  audioSystem.playMusic('gameplay')
-  audioSystem.playAmbience()
+export function transitionToGameplayAudio(audio) {
+  audio.stopMusic()
+  audio.playMusic('gameplay')
+  audio.playAmbience()
 }
 
-/**
- * Integration function: Call this when game ends
- * @param {Audio} audioSystem - The audio system instance
- * @param {boolean} isVictory - Whether player won (for future victory music)
- */
-export function transitionToGameOverAudio(audioSystem, isVictory = false) {
-  audioSystem.stopMusic()
-  audioSystem.stopAmbience()
-  // Victory sound would play automatically via audioSystem.play('victory')
-  // if called from game logic
+export function transitionToGameOverAudio(audio) {
+  audio.stopMusic()
+  audio.stopAmbience()
 }
