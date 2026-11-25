@@ -1,0 +1,637 @@
+/* ═══════════════════════════════════════════════════════════
+   DANFO DASH 2026 — Complete stylesheet
+   Performance-first. No blur. Glassmorphism for modals.
+   HUD never overflows on mobile.
+   ═══════════════════════════════════════════════════════════ */
+@import url('https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@700;800;900&display=swap');
+
+:root {
+  --yellow:  #FFD600; --yellow-dk:#E6A800; --yellow-sh:#9A6C00;
+  --sky:     #1E88E5; --green:    #2E7D32;
+  --red:     #E53935; --coin:     #FFD600;
+  --fh:'Fredoka One',cursive; --fb:'Nunito',sans-serif;
+  /* glassmorphism */
+  --glass-bg:   rgba(255,255,255,0.08);
+  --glass-bg2:  rgba(255,255,255,0.12);
+  --glass-border: rgba(255,255,255,0.22);
+  --glass-shadow: 0 8px 32px rgba(0,0,0,0.45);
+  --glass-blur:   blur(20px) saturate(180%);
+}
+
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{
+  /* Use --vh set by the inline script so height exactly matches the visible
+     viewport on mobile — avoids content hiding behind the address bar */
+  width:100%;
+  height:100vh; /* fallback */
+  height:calc(var(--vh, 1vh) * 100);
+  overflow:hidden;background:#FFD600;
+  font-family:var(--fb);-webkit-font-smoothing:antialiased;
+  user-select:none;-webkit-user-select:none;
+  -webkit-tap-highlight-color:transparent;touch-action:none;
+}
+
+#game-root{
+  position:fixed;
+  /* Stretch to full visual viewport including safe-area notches */
+  top:0; left:0; right:0; bottom:0;
+  /* Explicit safe-area fallback for older iOS */
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+  padding-left:env(safe-area-inset-left,0px);
+  padding-right:env(safe-area-inset-right,0px);
+  /* Cancel the padding from layout — game canvas ignores it,
+     but UI elements get the inset automatically via HUD padding */
+  box-sizing:border-box;
+  background:#FFD600;
+}
+
+/* Canvas must always fill the full window — no gaps */
+#canvas-host{
+  position:absolute;
+  top:0;left:0;
+  width:100%;
+  height:100vh; /* fallback */
+  height:calc(var(--vh, 1vh) * 100);
+  background:transparent;
+  overflow:hidden;
+}
+#canvas-host canvas{
+  display:block;
+  width:100%!important;
+  height:100%!important;
+  position:absolute;
+  top:0;left:0;
+}
+
+/* ══════════════════════════════════════════════
+   SPLASH SCREEN — appears before loading screen
+   ══════════════════════════════════════════════ */
+#splash{
+  position:fixed;inset:0;z-index:999;
+  background:#FFD600;
+  display:flex;flex-direction:column;
+  align-items:center;justify-content:center;
+  animation:splashExit 0.4s ease-in 2.4s forwards;
+  pointer-events:none;
+}
+#splash-title{
+  font-family:'Impact','Arial Black',sans-serif;
+  font-size:clamp(56px,14vw,130px);
+  font-weight:900;
+  color:#0D0D0D;
+  letter-spacing:6px;
+  text-align:center;
+  line-height:1;
+  text-shadow:
+    6px 6px 0 rgba(0,0,0,0.18),
+    0 2px 24px rgba(0,0,0,0.12);
+  animation:splashZoomIn 0.55s cubic-bezier(0.22,1.4,0.5,1) both;
+}
+#splash-sub{
+  font-family:'Fredoka One',cursive;
+  font-size:clamp(16px,3.5vw,28px);
+  color:#1A1A1A;
+  letter-spacing:3px;
+  margin-top:14px;
+  opacity:0.75;
+  text-transform:uppercase;
+  animation:splashZoomIn 0.55s cubic-bezier(0.22,1.4,0.5,1) 0.15s both;
+}
+@keyframes splashZoomIn{
+  from{opacity:0;transform:scale(0.72);}
+  to  {opacity:1;transform:scale(1);}
+}
+@keyframes splashExit{
+  from{opacity:1;transform:scale(1);}
+  to  {opacity:0;transform:scale(1.04);pointer-events:none;}
+}
+
+@keyframes fadeOut{to{opacity:0}}
+#ui{position:absolute;inset:0;z-index:10;pointer-events:none}
+
+/* ── Generic screen ── */
+.screen{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;pointer-events:auto}
+.screen.hidden,.modal-layer.hidden,#hud.hidden{display:none!important}
+
+/* ── Modal overlay ── */
+.modal-layer{
+  position:fixed;inset:0;z-index:30;
+  display:flex;align-items:center;justify-content:center;
+  background:rgba(5,10,30,0.72);
+  backdrop-filter:var(--glass-blur);
+  pointer-events:auto;padding:16px;
+}
+
+/* ── GLASSMORPHISM card ── */
+.card{
+  background:var(--glass-bg2);
+  border:1.5px solid var(--glass-border);
+  border-radius:24px;padding:24px 20px;
+  width:min(420px,96vw);max-height:90vh;overflow-y:auto;
+  display:flex;flex-direction:column;align-items:center;gap:14px;
+  box-shadow:var(--glass-shadow);
+  backdrop-filter:var(--glass-blur);
+  -webkit-backdrop-filter:var(--glass-blur);
+}
+
+/* ── Buttons ── */
+.btn{
+  font-family:var(--fb);font-weight:900;border:none;border-radius:18px;
+  cursor:pointer;padding:15px 24px;min-width:180px;
+  display:inline-flex;align-items:center;justify-content:center;gap:8px;
+  font-size:17px;transition:transform .07s;
+}
+.btn:active{transform:translateY(3px)}
+.btn-yellow{background:linear-gradient(180deg,#1A1A1A,#000);color:#FFD600;box-shadow:0 6px 0 #000;border:3px solid #000}
+.btn-yellow:active{box-shadow:0 2px 0 #000}
+.btn-green{background:linear-gradient(180deg,#56E07B,#2E7D32);color:#051A08;box-shadow:0 5px 0 #1B5E20}
+.btn-green:active{box-shadow:0 2px 0 #1B5E20}
+.btn-sky{background:linear-gradient(180deg,#64D8FF,#1E88E5);color:#002233;box-shadow:0 5px 0 #0D47A1}
+.btn-sky:active{box-shadow:0 2px 0 #0D47A1}
+.btn-ghost{background:var(--glass-bg);color:#fff;border:1.5px solid var(--glass-border);box-shadow:none}
+.btn-fb{background:#1877F2;color:#fff;box-shadow:0 5px 0 #0C47C4}
+.btn-fb:active{box-shadow:0 2px 0 #0C47C4}
+.btn-gg{background:#fff;color:#333;box-shadow:0 5px 0 #ccc}
+.btn-lg{font-size:20px;padding:18px 34px;min-width:250px;border-radius:20px}
+.btn-sm{font-size:14px;padding:9px 14px;min-width:0;border-radius:12px}
+.btn-full{width:100%}
+
+/* ═══════════════════════════════════
+   LOADING  (z:40) — Yellow Lagos theme background
+   ═══════════════════════════════════ */
+#screen-loading{
+  position:fixed;
+  inset:0;
+  z-index:1000;  /* above splash (999) so it's never blocked */
+  background-image:url('/src/assets/danfo.png.jpeg');
+  background-size:contain;
+  background-position:center center;
+  background-repeat:no-repeat;
+  background-color:#FFD600;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:flex-end;
+  gap:10px;
+  padding:20px 20px 44px 20px;
+  pointer-events:auto;
+  overflow:hidden;
+}
+#screen-loading.hidden{display:none!important}
+
+/* Spinner ring */
+.load-spinner{
+  position:relative;
+  width:52px;height:52px;
+  margin-bottom:4px;
+}
+.load-spinner-ring{
+  position:absolute;inset:0;
+  border-radius:50%;
+  border:5px solid rgba(0,0,0,0.15);
+  border-top-color:#0D1B2A;
+  animation:spinRing 0.9s linear infinite;
+}
+@keyframes spinRing{to{transform:rotate(360deg)}}
+
+/* Status label e.g. "BUILDING SCENE..." */
+.load-status{
+  font-family:'Impact','Arial Black',sans-serif;
+  font-size:clamp(13px,3vw,18px);
+  font-weight:900;
+  letter-spacing:4px;
+  color:#0D1B2A;
+  text-transform:uppercase;
+  opacity:0.75;
+}
+
+.load-percent{
+  font-family:'Impact', 'Arial Black', sans-serif;
+  font-size:clamp(52px,13vw,80px);
+  font-weight:900;
+  color:#0D1B2A;
+  line-height:1;
+  letter-spacing:2px;
+  text-shadow:0 4px 0 rgba(0,0,0,0.12);
+}
+
+.load-bar-wrap{
+  width:clamp(240px,80vw,420px);
+  height:14px;
+  background:rgba(0,0,0,0.20);
+  border-radius:10px;
+  overflow:hidden;
+  border:2px solid rgba(0,0,0,0.25);
+  margin-bottom:8px;
+}
+.load-bar{
+  height:100%;
+  background:linear-gradient(90deg, #0D1B2A 0%, #1A3A5C 60%, #0D1B2A 100%);
+  background-size:200% 100%;
+  border-radius:8px;
+  width:1%;
+  transition:width 0.25s ease-out;
+  animation:barShimmer 1.6s linear infinite;
+}
+@keyframes barShimmer{
+  0%  {background-position:200% 0}
+  100%{background-position:-200% 0}
+}
+
+/* ═══════════════════════════════════
+   LANDING PAGE — Game scene background (not yellow)
+   ═══════════════════════════════════ */
+#screen-landing{
+  position:absolute;inset:0;z-index:10;pointer-events:auto;overflow:hidden;
+  /* No background color - shows the game scene underneath */
+}
+#screen-landing.hidden{display:none!important}
+.hero-svg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.landing-ui{
+  position:absolute;inset:0;
+  display:flex;flex-direction:column;align-items:center;justify-content:flex-end;
+  padding:0 20px clamp(28px,8vh,52px);gap:12px;
+}
+
+.landing-title{
+  font-family:'Impact', 'Arial Black', sans-serif;
+  font-size:clamp(72px,18vw,130px);
+  font-weight:900;
+  line-height:.85;
+  letter-spacing:4px;
+  color:#fff;
+  text-transform:uppercase;
+  /* Graffiti-style text effects */
+  text-shadow:
+    5px 5px 0 #000,
+    -2px -2px 0 #000,
+    2px -2px 0 #000,
+    -2px 2px 0 #000,
+    0 8px 16px rgba(0,0,0,.6);
+  text-align:center;
+  animation:titlePop .7s cubic-bezier(.34,1.56,.64,1) both .1s;
+  -webkit-text-stroke:4px #000;
+  paint-order:stroke fill;
+  position:relative;
+}
+@keyframes titlePop{from{transform:translateY(-28px) scale(.72);opacity:0}to{transform:none;opacity:1}}
+.landing-sub{
+  font-family:var(--fh);font-size:clamp(14px,3.8vw,21px);
+  color:#fff;text-shadow:0 2px 8px rgba(0,0,0,.8);text-align:center;
+  font-weight:900;
+  animation:fadeUp .5s ease both .4s;
+}
+@keyframes fadeUp{from{transform:translateY(14px);opacity:0}to{transform:none;opacity:1}}
+.landing-btns{display:flex;flex-direction:column;align-items:center;gap:10px;width:100%;animation:fadeUp .5s ease both .6s}
+.landing-badges{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;animation:fadeUp .5s ease both .8s}
+.badge{
+  background:var(--glass-bg);border:1.5px solid rgba(255,214,0,.5);
+  border-radius:20px;padding:5px 12px;font-size:12px;font-weight:900;color:var(--yellow);
+  backdrop-filter:blur(8px);
+}
+
+/* ═══════════════════════════════════
+   MAIN MENU
+   ═══════════════════════════════════ */
+#screen-menu{position:absolute;inset:0;z-index:10;pointer-events:auto;overflow:hidden}
+#screen-menu.hidden{display:none!important}
+.menu-gradient{position:absolute;inset:0;background:linear-gradient(to bottom,transparent 0%,rgba(5,15,50,.6) 40%,rgba(5,15,50,.92) 100%);pointer-events:none}
+.menu-ui{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;padding:0 20px clamp(24px,6vh,40px);gap:10px}
+.menu-title{font-family:var(--fh);font-size:clamp(44px,12vw,78px);color:var(--yellow);line-height:.9;text-shadow:0 5px 0 var(--yellow-sh),0 10px 24px rgba(0,0,0,.5);text-align:center;letter-spacing:2px}
+.menu-info-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:center}
+.menu-pill{
+  display:flex;align-items:center;gap:6px;
+  background:var(--glass-bg);border:1.5px solid var(--glass-border);
+  border-radius:50px;padding:8px 16px;font-weight:900;font-size:15px;color:#fff;
+  backdrop-filter:blur(8px);
+}
+.menu-best-lbl{font-size:10px;letter-spacing:2px;opacity:.6}
+.menu-best-val{font-size:22px;color:var(--yellow);line-height:1}
+.menu-btn-col{display:flex;flex-direction:column;align-items:center;gap:10px;width:100%}
+
+/* ═══════════════════════════════════
+   HUD (z:20) — mobile-safe, never overflows
+   ═══════════════════════════════════ */
+#hud{
+  position:absolute;inset:0;z-index:20;pointer-events:none;
+  /* Use safe-area padding for phones with notches */
+  padding:max(14px,env(safe-area-inset-top)) 14px max(20px,env(safe-area-inset-bottom)) 14px;
+  display:flex;flex-direction:column;justify-content:space-between;
+}
+/* Top row: coins | score | lives+pause */
+.hud-top{
+  display:flex;align-items:flex-start;justify-content:space-between;
+  gap:8px;width:100%;
+}
+
+/* Coins — left */
+.hud-coins{
+  display:flex;align-items:center;gap:7px;flex-shrink:0;
+  background:var(--glass-bg2);border:1.5px solid rgba(255,214,0,.45);
+  border-radius:50px;padding:8px 14px;
+  backdrop-filter:blur(10px);min-width:80px;
+}
+.hud-coin-icon{font-size:26px;line-height:1}
+.hud-coins-val{font-family:var(--fh);font-size:26px;color:var(--coin);line-height:1}
+
+/* Score — centre */
+.hud-score{
+  flex:1;display:flex;flex-direction:column;align-items:center;
+  background:var(--glass-bg2);border:1.5px solid rgba(255,255,255,.18);
+  border-radius:16px;padding:7px 14px;min-width:0;max-width:180px;
+  align-self:flex-start;margin:0 6px;
+  backdrop-filter:blur(10px);
+}
+.hud-score-lbl{font-size:9px;letter-spacing:3px;color:rgba(255,255,255,.65);font-weight:900}
+.hud-score-val{font-family:var(--fh);font-size:clamp(28px,8vw,36px);color:#fff;line-height:1}
+
+/* Right column: lives + pause + mute */
+.hud-right{
+  display:flex;flex-direction:column;align-items:flex-end;gap:8px;flex-shrink:0;
+  pointer-events:auto;
+}
+.hud-lives{
+  display:flex;gap:3px;align-items:center;
+  background:var(--glass-bg2);border:1.5px solid rgba(255,255,255,.18);
+  border-radius:50px;padding:7px 10px;
+  backdrop-filter:blur(10px);
+}
+.hud-heart{font-size:clamp(18px,5vw,24px);line-height:1}
+.hud-heart.off{opacity:.2;filter:grayscale(1)}
+.hud-icon-btn{
+  width:clamp(42px,12vw,50px);height:clamp(42px,12vw,50px);border-radius:14px;
+  background:var(--glass-bg2);border:1.5px solid rgba(255,255,255,.18);
+  color:#fff;font-size:clamp(15px,4.5vw,18px);cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  backdrop-filter:blur(10px);
+}
+
+/* Distance — left side, below coins */
+.hud-mid{display:flex;align-items:center}
+.hud-dist{
+  background:var(--glass-bg);border:1px solid rgba(255,255,255,.15);
+  border-radius:50px;padding:5px 12px;
+  font-size:clamp(11px,3.2vw,14px);font-weight:900;color:rgba(255,255,255,.85);
+  backdrop-filter:blur(8px);
+}
+
+/* Power-up bar — bottom centre */
+.hud-bottom{display:flex;justify-content:center}
+.hud-pu{
+  background:var(--glass-bg2);border:2px solid rgba(255,214,0,.6);
+  border-radius:50px;padding:10px 20px;
+  display:flex;align-items:center;gap:10px;
+  font-size:clamp(14px,4vw,16px);font-weight:900;color:var(--yellow);
+  min-width:clamp(180px,55vw,240px);justify-content:center;
+  backdrop-filter:blur(10px);
+}
+.hud-pu.hidden{display:none!important}
+.hud-pu-wrap{width:clamp(80px,25vw,110px);height:9px;background:rgba(255,255,255,.2);border-radius:6px;overflow:hidden}
+.hud-pu-bar{height:100%;background:var(--yellow);border-radius:6px;transition:width .12s linear}
+
+/* ═══════════════════════════════════
+   CHARACTER SELECT — glassmorphism
+   ═══════════════════════════════════ */
+#screen-charselect{
+  position:absolute;inset:0;z-index:10;
+  /* glassmorphism background */
+  background:linear-gradient(135deg,rgba(13,27,62,0.88),rgba(22,34,68,0.92));
+  backdrop-filter:var(--glass-blur);
+  -webkit-backdrop-filter:var(--glass-blur);
+  display:flex;flex-direction:column;pointer-events:auto;overflow:hidden;
+}
+#screen-charselect.hidden{display:none!important}
+.cs-header{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:14px 20px;
+  background:var(--glass-bg);border-bottom:1.5px solid var(--glass-border);
+  backdrop-filter:blur(12px);flex-shrink:0;
+}
+.cs-title{font-family:var(--fh);font-size:26px;color:var(--yellow);text-shadow:0 2px 0 var(--yellow-sh)}
+.cs-coins{display:flex;align-items:center;gap:6px;font-weight:900;font-size:17px;color:var(--coin)}
+.cs-body{flex:1;display:flex;flex-direction:column;align-items:center;gap:14px;padding:18px 20px;overflow-y:auto;width:100%}
+.cs-preview-ring{
+  width:min(160px,44vw);aspect-ratio:1;border-radius:50%;
+  /* glassmorphism ring */
+  background:var(--glass-bg2);border:2px solid rgba(255,214,0,.5);
+  box-shadow:0 0 32px rgba(255,214,0,.2),inset 0 1px 0 rgba(255,255,255,.15);
+  backdrop-filter:blur(10px);
+  display:flex;align-items:center;justify-content:center;
+}
+.cs-preview-emoji{font-size:84px;filter:drop-shadow(0 4px 10px rgba(0,0,0,.5))}
+.cs-preview-name{font-family:var(--fh);font-size:28px;color:#fff}
+.cs-nav-row{display:flex;gap:18px;align-items:center}
+.cs-nav-btn{
+  width:50px;height:50px;border-radius:50%;
+  background:var(--glass-bg2);border:2px solid var(--glass-border);
+  color:#fff;font-size:22px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  backdrop-filter:blur(8px);
+}
+/* 3-col grid on mobile */
+.cs-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;width:100%;max-width:400px}
+.cs-card{
+  /* glassmorphism cards */
+  background:var(--glass-bg);border:1.5px solid var(--glass-border);
+  border-radius:16px;padding:12px 8px;cursor:pointer;
+  display:flex;flex-direction:column;align-items:center;gap:5px;
+  position:relative;transition:border-color .15s;
+  backdrop-filter:blur(8px);
+}
+.cs-card.selected{border-color:var(--yellow);background:rgba(255,214,0,.15);box-shadow:0 0 16px rgba(255,214,0,.3)}
+.cs-card.locked{opacity:.6}
+.cs-card-emoji{font-size:36px}
+.cs-card-name{font-size:11px;font-weight:900;color:#fff}
+.cs-card-cost{font-size:11px;font-weight:900;color:var(--coin)}
+.cs-lock{position:absolute;top:5px;right:5px;font-size:12px}
+.cs-action{display:flex;flex-direction:column;gap:10px;width:100%;max-width:400px}
+
+/* ═══════════════════════════════════
+   MODALS — glassmorphism
+   ═══════════════════════════════════ */
+.panel-title{font-family:var(--fh);font-size:34px;color:var(--yellow);text-shadow:0 3px 0 var(--yellow-sh);text-align:center}
+.panel-score-lbl{font-size:11px;letter-spacing:2px;opacity:.6;text-align:center}
+.panel-score-val{font-family:var(--fh);font-size:66px;color:var(--yellow);text-shadow:0 4px 0 var(--yellow-sh);line-height:1;text-align:center}
+.panel-best{font-size:15px;font-weight:900;text-align:center;padding:7px 18px;border-radius:50px;background:rgba(255,214,0,.12);border:1.5px solid rgba(255,214,0,.3);color:#fff}
+.panel-best.new{color:#56E07B;border-color:#56E07B;background:rgba(86,224,123,.12)}
+.panel-stats{display:flex;gap:12px;width:100%}
+.panel-stat{flex:1;background:var(--glass-bg);border-radius:14px;padding:12px 10px;text-align:center;border:1px solid var(--glass-border)}
+.panel-stat-lbl{font-size:10px;letter-spacing:1.5px;opacity:.6}
+.panel-stat-val{font-size:22px;font-weight:900;color:#fff}
+.panel-btn-col{display:flex;flex-direction:column;gap:10px;width:100%}
+.login-input{
+  width:100%;padding:13px 16px;border-radius:14px;
+  background:var(--glass-bg2);border:1.5px solid var(--glass-border);
+  color:#fff;font-family:var(--fb);font-size:16px;font-weight:700;outline:none;
+  backdrop-filter:blur(8px);
+}
+.login-input::placeholder{color:rgba(255,255,255,.4)}
+.login-input:focus{border-color:var(--yellow)}
+.login-sub{font-size:13px;opacity:.7;text-align:center;color:#fff}
+.divider{width:100%;display:flex;align-items:center;gap:10px;color:rgba(255,255,255,.4);font-size:13px}
+.divider::before,.divider::after{content:'';flex:1;height:1px;background:rgba(255,255,255,.15)}
+.rules-list{list-style:none;padding:0;display:flex;flex-direction:column;gap:10px;width:100%}
+.rules-list li{display:flex;align-items:flex-start;gap:10px;font-size:14px;line-height:1.4;color:#fff}
+.rules-icon{font-size:20px;flex-shrink:0}
+.rules-list b{color:var(--yellow)}
+
+/* Leaderboard — glassmorphism rows */
+.lb-row{
+  display:flex;align-items:center;gap:12px;
+  padding:11px 14px;border-radius:14px;width:100%;
+  background:var(--glass-bg);border:1px solid var(--glass-border);
+  backdrop-filter:blur(8px);
+}
+.lb-rank{font-family:var(--fh);font-size:22px;width:32px;text-align:center}
+.lb-gold{color:#FFD700}.lb-silver{color:#C0C0C0}.lb-bronze{color:#CD7F32}
+.lb-name{flex:1;font-weight:900;font-size:15px;color:#fff}
+.lb-score{font-weight:900;font-size:17px;color:var(--yellow)}
+.lb-me{border-color:var(--yellow);background:rgba(255,214,0,.1)}
+.lb-status{font-size:13px;opacity:.65;text-align:center;color:#fff;padding:8px 0}
+
+/* ═══════════════════════════════════
+   RESPONSIVE
+   ═══════════════════════════════════ */
+@media(max-width:380px){
+  .hud-score-val{font-size:24px}
+  .hud-coins-val{font-size:22px}
+  .btn-lg{font-size:17px;padding:16px 24px;min-width:220px}
+  .cs-grid{grid-template-columns:repeat(2,1fr)}
+}
+@media(max-height:640px){
+  .landing-ui{padding-bottom:20px}
+  .landing-title{font-size:50px}
+  .landing-badges{display:none}
+  .menu-ui{padding-bottom:18px}
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   MOBILE  ≤ 480px — Every override here is LARGER than the base.
+   Root cause of previous shrinkage: clamp() minimums were below
+   base values, so mobile ended up smaller than desktop.
+   ═══════════════════════════════════════════════════════════════ */
+@media (max-width: 480px) {
+
+  /* ── Loading screen ──────────────────────────────────────── */
+  .load-status  { font-size: 15px; letter-spacing: 3px; }
+  .load-percent { font-size: clamp(64px, 18vw, 90px); }
+  .load-bar-wrap{ width: 88vw; height: 16px; }
+  .load-spinner { width: 60px; height: 60px; }
+
+  /* ── Landing page ────────────────────────────────────────── */
+  .landing-title { font-size: clamp(60px, 16vw, 86px); }
+  .landing-sub   { font-size: clamp(16px, 4.8vw, 22px); }
+  .landing-ui    { padding: 0 16px clamp(32px, 9vh, 56px); gap: 14px; }
+
+  /* PLAY NOW — primary CTA, must be unmissable */
+  .btn-lg {
+    font-size: clamp(20px, 5.5vw, 24px);
+    padding: 20px 28px;
+    min-height: 64px;
+    border-radius: 20px;
+    letter-spacing: 1px;
+  }
+
+  /* All buttons: comfortable 48px+ tap target */
+  .btn {
+    font-size: clamp(16px, 4.5vw, 19px);
+    padding: 15px 20px;
+    min-height: 52px;
+    min-width: 0;
+    width: 100%;
+    border-radius: 16px;
+  }
+  .btn-sm {
+    font-size: 14px;
+    padding: 11px 16px;
+    min-height: 44px;
+    min-width: 0;
+  }
+
+  /* ── Main menu ───────────────────────────────────────────── */
+  .menu-title    { font-size: clamp(50px, 14vw, 76px); }
+  .menu-pill     { font-size: 15px; padding: 9px 16px; gap: 7px; }
+  .menu-best-val { font-size: 24px; }
+  .menu-btn-col  { gap: 12px; }
+
+  /* ── HUD — in-game overlay ───────────────────────────────── */
+  #hud {
+    padding:
+      max(12px, env(safe-area-inset-top))
+      12px
+      max(16px, env(safe-area-inset-bottom))
+      12px;
+  }
+  .hud-coins  { padding: 9px 14px; gap: 7px; min-width: 0; }
+  .hud-coin-icon { font-size: 28px; }
+  .hud-coins-val { font-size: 28px; }
+
+  .hud-score     { padding: 7px 12px; max-width: 160px; margin: 0 6px; }
+  .hud-score-lbl { font-size: 9px; letter-spacing: 2.5px; }
+  .hud-score-val { font-size: clamp(30px, 8.5vw, 38px); }
+
+  .hud-heart   { font-size: clamp(22px, 6vw, 28px); }
+  .hud-lives   { padding: 8px 11px; gap: 4px; }
+  .hud-icon-btn{
+    width:  clamp(48px, 13vw, 56px);
+    height: clamp(48px, 13vw, 56px);
+    font-size: clamp(18px, 5vw, 22px);
+    border-radius: 15px;
+  }
+  .hud-dist    { font-size: clamp(13px, 3.8vw, 16px); padding: 6px 12px; }
+  .hud-pu {
+    font-size: clamp(14px, 4.2vw, 17px);
+    padding: 11px 18px;
+    min-width: clamp(180px, 72vw, 260px);
+    gap: 10px;
+  }
+  .hud-pu-wrap { width: clamp(80px, 24vw, 110px); height: 10px; }
+
+  /* ── Modals / game over ──────────────────────────────────── */
+  .card          { padding: 22px 18px; gap: 13px; border-radius: 22px; }
+  .panel-title   { font-size: clamp(28px, 8.5vw, 36px); }
+  .panel-score-val{ font-size: clamp(56px, 16vw, 72px); }
+  .panel-best    { font-size: 14px; padding: 8px 16px; }
+  .panel-stat-val{ font-size: 22px; }
+  .panel-stat-lbl{ font-size: 11px; }
+
+  /* ── Character select ────────────────────────────────────── */
+  .cs-title        { font-size: 22px; }
+  .cs-preview-emoji{ font-size: clamp(72px, 20vw, 92px); }
+  .cs-preview-name { font-size: clamp(24px, 7vw, 30px); }
+  .cs-preview-ring { width: min(148px, 42vw); }
+  .cs-card-emoji   { font-size: clamp(32px, 9vw, 40px); }
+  .cs-card-name    { font-size: 11px; }
+  .cs-card-cost    { font-size: 11px; }
+  .cs-nav-btn      { width: 52px; height: 52px; font-size: 24px; }
+  .cs-body         { gap: 16px; padding: 16px; }
+
+  /* ── Leaderboard ─────────────────────────────────────────── */
+  .lb-name  { font-size: 14px; }
+  .lb-score { font-size: 16px; }
+  .lb-rank  { font-size: 20px; width: 30px; }
+
+  /* ── Login ───────────────────────────────────────────────── */
+  .login-input { font-size: 16px; padding: 14px 16px; }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   LANDSCAPE PHONE — rotated, short viewport
+   ═══════════════════════════════════════════════════════════════ */
+@media (max-height: 500px) and (orientation: landscape) {
+  #hud {
+    padding-top:    max(6px, env(safe-area-inset-top));
+    padding-bottom: max(6px, env(safe-area-inset-bottom));
+  }
+  .hud-score-val  { font-size: 24px; }
+  .hud-coins-val  { font-size: 22px; }
+  .hud-coin-icon  { font-size: 22px; }
+  .hud-heart      { font-size: 20px; }
+  .hud-icon-btn   { width: 42px; height: 42px; font-size: 16px; }
+  .hud-pu         { padding: 8px 16px; font-size: 14px; min-width: 170px; }
+  .landing-badges { display: none; }
+  .menu-ui        { padding-bottom: 14px; gap: 8px; }
+  .menu-title     { font-size: 40px; }
+  .btn-lg         { padding: 14px 24px; min-height: 52px; font-size: 18px; }
+}

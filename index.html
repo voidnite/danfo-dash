@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en" style="background:#FFD600">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0,
+          maximum-scale=1.0, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-visual" />
+    <meta name="theme-color" content="#FFD600" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="description" content="Danfo Dash — dodge Lagos traffic, collect coins and survive the rush in this addictive 3D endless runner." />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <title>Danfo Dash — Survive the Lagos Rush</title>
+    <!-- Inline critical styles — painted BEFORE any external CSS loads,
+         preventing the white flash on refresh -->
+    <style>
+      html, body {
+        margin: 0; padding: 0;
+        background: #FFD600;
+        width: 100%; height: 100%;
+        overflow: hidden;
+      }
+      #game-root {
+        position: fixed; inset: 0;
+        background: #FFD600;
+      }
+      #splash {
+        position: fixed; inset: 0;
+        background: #FFD600;
+        display: flex; flex-direction: column;
+        align-items: center; justify-content: center;
+        z-index: 999;
+      }
+      #splash-title {
+        font-family: Impact, 'Arial Black', sans-serif;
+        font-size: clamp(56px, 14vw, 130px);
+        font-weight: 900;
+        color: #0D0D0D;
+        letter-spacing: 6px;
+        text-align: center;
+        line-height: 1;
+      }
+      #splash-sub {
+        font-family: Impact, 'Arial Black', sans-serif;
+        font-size: clamp(16px, 3.5vw, 28px);
+        color: #1A1A1A;
+        letter-spacing: 3px;
+        margin-top: 14px;
+        opacity: 0.75;
+        text-transform: uppercase;
+      }
+    </style>
+    <!-- Cache busting for mobile v5 -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
+    <meta name="version" content="5" />
+    <!-- Fonts preloaded for instant render -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet" />
+    <script>
+      // Fix mobile viewport height: 100vh includes the browser chrome on some
+      // phones, causing the game to extend behind the address bar.
+      // We write --vh as 1% of the actual visible height so CSS can use
+      // calc(var(--vh, 1vh) * 100) instead of 100vh.
+      function setVh() {
+        const vh = (window.visualViewport ? window.visualViewport.height : window.innerHeight) * 0.01
+        document.documentElement.style.setProperty('--vh', vh + 'px')
+      }
+      setVh()
+      window.addEventListener('resize', setVh)
+      if (window.visualViewport) window.visualViewport.addEventListener('resize', setVh)
+    </script>
+  </head>
+  <body style="background:#FFD600">
+    <!--
+      #game-root
+       ├─ #canvas-host   ← Three.js WebGL canvas lives here
+       └─ #ui            ← All DOM screens / overlays injected by UI.js
+    -->
+    <div id="game-root">
+      <!-- Splash screen: shown immediately, removed after animation -->
+      <div id="splash">
+        <div id="splash-title">DANFO DASH</div>
+        <div id="splash-sub">Survive the Lagos Rush</div>
+      </div>
+      <div id="canvas-host"></div>
+      <div id="ui"></div>
+    </div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
